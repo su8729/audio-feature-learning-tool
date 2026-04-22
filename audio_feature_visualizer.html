@@ -1,0 +1,536 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Audio Feature Visualizer — Real STFT/MFCC Edition</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#f5f7fb;--bg2:#eef2f8;--surface:#fff;--surface-soft:#f8faff;--surface-strong:#edf3ff;
+  --border:#dbe4f0;--border-strong:#c8d6ea;--text:#172033;--text2:#55627a;--text3:#7d8aa2;
+  --primary:#3b82f6;--primary-soft:#e8f1ff;--primary-strong:#1d4ed8;--green:#10b981;
+  --green-soft:#e7fbf4;--orange:#f59e0b;--orange-soft:#fff6e5;--purple:#7c3aed;
+  --purple-soft:#f2ebff;--red:#ef4444;--shadow:0 10px 30px rgba(23,32,51,.08);
+  --shadow-soft:0 6px 16px rgba(23,32,51,.05);--font-body:'Inter',sans-serif;--font-mono:'JetBrains Mono',monospace;
+}
+body{background:linear-gradient(180deg,var(--bg) 0%,#f8fbff 100%);color:var(--text);font-family:var(--font-body);min-height:100vh;font-size:14px;line-height:1.6}
+.app{max-width:1280px;margin:0 auto;padding:28px 18px 56px}
+.hero{display:grid;grid-template-columns:1.35fr .95fr;gap:18px;margin-bottom:20px}
+@media(max-width:900px){.hero{grid-template-columns:1fr}}
+.hero-main,.hero-side,.card,.upload-card,.upload-meta,.nav-wrap,.study-banner,.insight-panel{background:var(--surface);border:1px solid var(--border);border-radius:24px;box-shadow:var(--shadow-soft)}
+.hero-main{padding:26px;position:relative;overflow:hidden}
+.hero-main:after{content:'';position:absolute;right:-80px;top:-80px;width:260px;height:260px;border-radius:50%;background:radial-gradient(circle, rgba(59,130,246,.18) 0%, rgba(59,130,246,0) 70%)}
+.kicker{display:inline-flex;align-items:center;gap:8px;padding:7px 12px;border-radius:999px;background:var(--primary-soft);color:var(--primary-strong);font-size:12px;font-weight:700;letter-spacing:.02em;margin-bottom:14px}.kicker:before{content:'';width:8px;height:8px;border-radius:50%;background:var(--primary)}
+h1{font-size:clamp(2rem,4vw,3rem);line-height:1.08;letter-spacing:-.04em;margin-bottom:10px}h1 span{color:var(--primary)}
+.hero-sub{font-size:15px;color:var(--text2);max-width:700px;margin-bottom:18px}
+.goal-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}@media(max-width:700px){.goal-grid{grid-template-columns:1fr}}
+.goal{background:var(--surface-soft);border:1px solid var(--border);border-radius:18px;padding:14px}.goal-label{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;color:var(--text3);margin-bottom:4px}.goal strong{display:block;font-size:14px;margin-bottom:3px}.goal p{font-size:12px;color:var(--text2)}
+.hero-side{padding:22px}.hero-side h2{font-size:15px;margin-bottom:10px}.hero-side ul{padding-left:18px;color:var(--text2);font-size:13px}.hero-side li+li{margin-top:8px}
+.study-banner{padding:14px 18px;margin-bottom:18px;display:flex;justify-content:space-between;align-items:center;gap:14px;flex-wrap:wrap;background:linear-gradient(135deg,#fff 0%, #f5f9ff 100%)}
+.study-banner strong{font-size:14px}.study-banner span{font-size:13px;color:var(--text2)}
+.mini-pipeline{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.pipe-item{padding:8px 12px;border-radius:999px;background:var(--surface-soft);border:1px solid var(--border);font-size:12px;font-weight:600;color:var(--text2)}.pipe-item.active{background:var(--primary-soft);color:var(--primary-strong);border-color:#bfd4fb}.pipe-arr{color:var(--text3);font-size:12px}
+.layout{display:grid;grid-template-columns:310px minmax(0,1fr);gap:18px}@media(max-width:1060px){.layout{grid-template-columns:1fr}}
+.sidebar{display:flex;flex-direction:column;gap:16px}.main{min-width:0}
+.upload-card{padding:22px;text-align:center;cursor:pointer;transition:.22s;border-style:dashed;background:linear-gradient(180deg,#fbfdff 0%,#f5f9ff 100%)}.upload-card:hover{transform:translateY(-1px);border-color:#aac7fb;box-shadow:var(--shadow)}
+.upload-icon{width:56px;height:56px;border-radius:18px;background:var(--primary-soft);display:flex;align-items:center;justify-content:center;margin:0 auto 12px;font-size:24px}
+.upload-card p{font-size:13px;color:var(--text2)} .upload-card strong{color:var(--primary-strong)} #file-input{display:none}
+.sidebar-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:18px;box-shadow:var(--shadow-soft)} .sidebar-title{font-size:13px;font-weight:800;letter-spacing:.02em;margin-bottom:10px} .sidebar-note{font-size:13px;color:var(--text2)}
+.study-list{display:grid;gap:9px}.study-tip{padding:11px 12px;border-radius:14px;background:var(--surface-soft);border:1px solid var(--border);font-size:12px;color:var(--text2)}.study-tip strong{display:block;color:var(--text);margin-bottom:3px}
+.upload-meta{padding:18px;display:none}.meta-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;margin-bottom:12px}.meta-stat{background:var(--surface-soft);border:1px solid var(--border);border-radius:14px;padding:12px}.meta-stat-label{font-size:10px;font-family:var(--font-mono);text-transform:uppercase;color:var(--text3);margin-bottom:4px}.meta-stat-val{font-size:18px;font-weight:800;color:var(--text)}
+audio{width:100%;border-radius:12px;height:42px}.upload-status{font-size:12px;font-family:var(--font-mono);border-radius:12px;padding:10px 12px;margin-top:10px;background:var(--green-soft);color:#047857;border:1px solid #b7efd9}.upload-status.error{background:#fff1f2;color:#be123c;border-color:#fecdd3}
+.nav-wrap{padding:10px;position:sticky;top:12px;z-index:10;margin-bottom:16px}.nav{display:flex;gap:8px;overflow:auto}.nav button{border:none;background:transparent;padding:12px 16px;border-radius:14px;font-size:13px;font-weight:700;color:var(--text2);cursor:pointer;white-space:nowrap;transition:.2s}.nav button.active{background:var(--primary);color:#fff;box-shadow:0 8px 20px rgba(59,130,246,.22)}.nav button:hover:not(.active){background:var(--surface-soft);color:var(--text)}
+.panel{display:none}.panel.active{display:block}.panel-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin-bottom:12px}.panel-title{font-size:26px;font-weight:800;letter-spacing:-.03em}.panel-sub{font-size:14px;color:var(--text2);max-width:760px}.learn-chip{padding:8px 11px;border-radius:999px;background:var(--orange-soft);color:#9a6700;font-size:12px;font-weight:700;border:1px solid #fde1a4}
+.learning-strip{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px}@media(max-width:760px){.learning-strip{grid-template-columns:1fr}}
+.learning-card{background:linear-gradient(180deg,#fff 0%, #f8fbff 100%);border:1px solid var(--border);border-radius:18px;padding:14px;box-shadow:var(--shadow-soft)} .learning-card .label{font-size:10px;font-family:var(--font-mono);text-transform:uppercase;color:var(--text3);margin-bottom:5px}.learning-card strong{display:block;font-size:14px;margin-bottom:4px}.learning-card p{font-size:12px;color:var(--text2)}
+.card{padding:18px;border-radius:22px;margin-bottom:14px}.card-title{font-size:15px;font-weight:800;margin-bottom:12px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}.card-title-mono{font-family:var(--font-mono);font-size:10px;padding:4px 8px;border-radius:999px;background:var(--purple-soft);color:var(--purple);border:1px solid #e2d3ff}
+.ctrl-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:850px){.ctrl-grid{grid-template-columns:1fr}}
+.ctrl-row{display:flex;align-items:center;gap:14px;margin-bottom:10px;flex-wrap:wrap}.ctrl-label{font-size:12px;color:var(--text2);font-family:var(--font-mono);min-width:180px}
+input[type=range]{flex:1;min-width:120px;-webkit-appearance:none;appearance:none;height:7px;border-radius:999px;background:#dce7f7;outline:none;cursor:pointer} input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:18px;height:18px;border-radius:50%;background:var(--primary);box-shadow:0 0 0 5px rgba(59,130,246,.15)} input[type=range]::-moz-range-thumb{width:18px;height:18px;border:none;border-radius:50%;background:var(--primary)}
+.ctrl-val{font-size:12px;font-family:var(--font-mono);font-weight:700;color:var(--primary-strong);min-width:86px;text-align:right}
+select{padding:10px 12px;border:1px solid var(--border-strong);border-radius:12px;background:#fff;color:var(--text);font-size:12px;font-family:var(--font-mono);outline:none;cursor:pointer;min-width:130px} select:focus{border-color:#9ec1ff;box-shadow:0 0 0 4px rgba(59,130,246,.08)}
+.metric-row{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}.metric{background:var(--surface-soft);border:1px solid var(--border);border-radius:16px;padding:13px 14px;flex:1;min-width:110px}.metric-label{font-size:10px;font-family:var(--font-mono);text-transform:uppercase;color:var(--text3);margin-bottom:4px}.metric-val{font-size:20px;font-weight:800}.metric-val span{font-size:11px;font-weight:600;color:var(--text2)}
+.chart-wrap{position:relative;width:100%;height:220px;margin-bottom:8px}.chart-wrap-sm{position:relative;height:150px}.two-col{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:760px){.two-col{grid-template-columns:1fr}}
+canvas.spectrogram{width:100%;height:240px;display:block;border-radius:16px;border:1px solid var(--border);background:#f9fbfe}
+.explain-box,.success-box,.warn-box,.info-box{border-radius:16px;padding:14px 16px;margin:10px 0 0;font-size:13px;line-height:1.65}.info-box{background:var(--primary-soft);border:1px solid #cfe0ff;color:#1e40af}.success-box{background:var(--green-soft);border:1px solid #b7efd9;color:#047857}.warn-box{background:var(--orange-soft);border:1px solid #fde1a4;color:#9a6700}.explain-box{background:#f7f5ff;border:1px solid #e5ddff;color:#5b21b6}
+.sect-label{font-size:11px;font-family:var(--font-mono);text-transform:uppercase;color:var(--text3);margin-bottom:7px}.badge{font-size:10px;font-family:var(--font-mono);padding:3px 8px;border-radius:999px;background:var(--green-soft);color:#047857;border:1px solid #b7efd9;margin-left:6px}.no-upload{font-size:12px;font-family:var(--font-mono);color:var(--text3);padding:.65rem 0}.divider{border:none;border-top:1px solid var(--border);margin:18px 0}
+.sum-table{width:100%;border-collapse:collapse;font-size:13px}.sum-table th{text-align:left;padding:12px 13px;border-bottom:1px solid var(--border-strong);font-size:10px;font-family:var(--font-mono);color:var(--text3);text-transform:uppercase}.sum-table td{padding:13px;border-bottom:1px solid var(--border);color:var(--text2);vertical-align:top}.sum-table td:first-child{font-family:var(--font-mono);font-size:12px;color:var(--primary-strong);font-weight:700}.sum-table tr:last-child td{border-bottom:none}.sum-table tr:hover td{background:var(--surface-soft)}
+.quiz-q{font-size:15px;font-weight:700;color:var(--text);margin-bottom:.8rem;line-height:1.6}.quiz-opt{display:block;width:100%;text-align:left;padding:12px 14px;margin-bottom:6px;border:1px solid var(--border-strong);border-radius:14px;background:#fff;cursor:pointer;font-size:13px;color:var(--text2);transition:.2s}.quiz-opt:hover:not(:disabled){background:var(--surface-soft);border-color:#aac7fb;color:var(--text)}.quiz-opt.correct{background:var(--green-soft);border-color:#7eddb8;color:#047857}.quiz-opt.wrong{background:#fff1f2;border-color:#fecdd3;color:#be123c}.quiz-fb{font-size:12px;font-family:var(--font-mono);margin-top:6px}.small-note{font-size:12px;color:var(--text3);font-family:var(--font-mono)}
+.insight-panel{padding:16px 18px;margin-bottom:14px;background:linear-gradient(180deg,#fff 0%, #f7fbff 100%)} .insight-title{font-size:12px;font-family:var(--font-mono);text-transform:uppercase;color:var(--text3);margin-bottom:8px}.insight-main{font-size:14px;font-weight:700;margin-bottom:6px}.insight-detail{font-size:13px;color:var(--text2)}
+.toggle-row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.pill{display:inline-flex;align-items:center;gap:8px;padding:8px 11px;border-radius:999px;border:1px solid var(--border);background:var(--surface-soft);font-size:12px;font-weight:700;color:var(--text2);cursor:pointer}.pill.active{background:var(--primary-soft);border-color:#bfd4fb;color:var(--primary-strong)}
+.tab-mini{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px}.tab-mini button{border:none;background:var(--surface-soft);padding:10px 12px;border-radius:12px;font-size:12px;font-weight:700;color:var(--text2);cursor:pointer}.tab-mini button.active{background:var(--primary);color:#fff}
+.hidden{display:none!important}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hero">
+    <section class="hero-main">
+      <div class="kicker">Interactive study interface</div>
+      <h1>Audio <span>Feature</span> Visualizer</h1>
+      <p class="hero-sub">Now upgraded with real STFT, real Mel filter banks, real MFCC, delta / delta-delta coefficients, and live learning feedback so each parameter change explains why the picture changed.</p>
+      <div class="goal-grid">
+        <div class="goal"><div class="goal-label">Step 1</div><strong>Generate or upload sound</strong><p>Try clean synthetic signals first, then compare them with real audio.</p></div>
+        <div class="goal"><div class="goal-label">Step 2</div><strong>See true computations</strong><p>Waveform, FFT, STFT, log spectrogram, MFCC, Δ, and ΔΔ all come from the actual signal.</p></div>
+        <div class="goal"><div class="goal-label">Step 3</div><strong>Learn causality</strong><p>Every key parameter update now explains the trade-off in plain language.</p></div>
+      </div>
+    </section>
+    <aside class="hero-side">
+      <h2>How to study with this version</h2>
+      <ul>
+        <li>Start with a sine, sweep, AM, or FM signal and predict what the spectrogram should look like.</li>
+        <li>Change one parameter at a time and watch the live explanation panel after every adjustment.</li>
+        <li>Turn log scale on and off to see weak harmonics become visible.</li>
+        <li>Move from MFCC to Δ and ΔΔ to connect static timbre with temporal change.</li>
+      </ul>
+    </aside>
+  </div>
+
+  <div class="study-banner">
+    <div><strong>Recommended study order:</strong> <span>Waveform → FFT → STFT / Log Spectrogram → MFCC → Δ / ΔΔ → Summary Quiz</span></div>
+    <div class="mini-pipeline">
+      <div class="pipe-item active">Waveform</div><div class="pipe-arr">→</div><div class="pipe-item">FFT</div><div class="pipe-arr">→</div><div class="pipe-item">STFT</div><div class="pipe-arr">→</div><div class="pipe-item">MFCC</div><div class="pipe-arr">→</div><div class="pipe-item">Δ / ΔΔ</div>
+    </div>
+  </div>
+
+  <div class="layout">
+    <aside class="sidebar">
+      <div class="upload-card" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">♪</div>
+        <p id="upload-label"><strong>Upload audio</strong> for real analysis</p>
+        <p style="margin-top:.35rem;font-size:11px;font-family:var(--font-mono);color:var(--text3)">WAV or MP3 • waveform/FFT/STFT/MFCC update together</p>
+      </div>
+      <input type="file" id="file-input" accept=".wav,.mp3,audio/*" onchange="handleUpload(event)">
+
+      <div id="upload-meta-card" class="upload-meta">
+        <div class="meta-grid" id="meta-row"></div>
+        <audio id="audio-player" controls></audio>
+        <div id="upload-status" style="display:none" class="upload-status"></div>
+      </div>
+
+      <div class="sidebar-box">
+        <div class="sidebar-title">Study checklist</div>
+        <div class="study-list">
+          <div class="study-tip"><strong>Waveform</strong> Can you explain why pitch is hidden even when loudness is visible?</div>
+          <div class="study-tip"><strong>FFT</strong> Can you connect a spectral peak to a tone or harmonic?</div>
+          <div class="study-tip"><strong>STFT</strong> Can you tell whether a pattern is stationary, sweeping, or modulated?</div>
+          <div class="study-tip"><strong>MFCC</strong> Can you explain why this is more compact than a log spectrogram?</div>
+          <div class="study-tip"><strong>Δ / ΔΔ</strong> Can you explain what changes over time, not just what exists?</div>
+        </div>
+      </div>
+
+      <div class="sidebar-box">
+        <div class="sidebar-title">Memory hook</div>
+        <div class="study-list" style="margin-top:8px">
+          <div class="study-tip"><strong>Waveform</strong> What happened over time?</div>
+          <div class="study-tip"><strong>FFT</strong> Which frequencies exist overall?</div>
+          <div class="study-tip"><strong>STFT</strong> Which frequencies appear when?</div>
+          <div class="study-tip"><strong>Log spectrum</strong> Which weak components become visible?</div>
+          <div class="study-tip"><strong>MFCC / Δ / ΔΔ</strong> Which compact patterns and changes matter for ML?</div>
+        </div>
+      </div>
+    </aside>
+
+    <main class="main">
+      <div class="nav-wrap">
+        <nav class="nav">
+          <button class="active" onclick="showTab('waveform',this)">Waveform</button>
+          <button onclick="showTab('fft',this)">Spectrum / FFT</button>
+          <button onclick="showTab('stft',this)">Spectrogram</button>
+          <button onclick="showTab('mfcc',this)">MFCC + Δ</button>
+          <button onclick="showTab('summary',this)">Summary & Quiz</button>
+        </nav>
+      </div>
+
+      <div class="insight-panel">
+        <div class="insight-title">Live learning feedback</div>
+        <div class="insight-main" id="live-insight-main">Change a parameter to see what it does.</div>
+        <div class="insight-detail" id="live-insight-detail">This panel turns knob changes into cause-and-effect explanations for studying.</div>
+      </div>
+
+      <div id="tab-waveform" class="panel active">
+        <div class="panel-head">
+          <div>
+            <p class="panel-title">Raw waveform</p>
+            <p class="panel-sub">A waveform shows amplitude over time. It is direct and intuitive, but it hides explicit frequency structure.</p>
+          </div>
+          <div class="learn-chip">Focus: amplitude ≠ frequency</div>
+        </div>
+        <div class="learning-strip">
+          <div class="learning-card"><div class="label">What to notice</div><strong>Only time is explicit</strong><p>You can track loudness and shape, but pitch content is not directly readable.</p></div>
+          <div class="learning-card"><div class="label">New signal set</div><strong>Try sweep, AM, and FM</strong><p>These patterns make the later spectrogram and MFCC views much more meaningful.</p></div>
+          <div class="learning-card"><div class="label">Study question</div><strong>Why not train on this directly?</strong><p>Because similar sounds can look very different sample-by-sample, and the dimensionality is huge.</p></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Signal playground <span class="card-title-mono">best for intuition</span></div>
+          <div class="ctrl-grid">
+            <div>
+              <div class="ctrl-row"><span class="ctrl-label">base frequency</span><input type="range" min="80" max="2000" value="440" step="5" id="sine-freq" oninput="onSignalChange('freq')"><span class="ctrl-val" id="sine-freq-v">440 Hz</span></div>
+              <div class="ctrl-row"><span class="ctrl-label">duration</span><input type="range" min="0.5" max="4" value="2" step="0.5" id="sine-dur" oninput="onSignalChange('dur')"><span class="ctrl-val" id="sine-dur-v">2.0 s</span></div>
+              <div class="ctrl-row"><span class="ctrl-label">signal type</span><select id="wave-type" onchange="onSignalChange('type')"><option value="sine">Pure sine</option><option value="chord">Two-tone chord</option><option value="noisy">Noisy sine</option><option value="sweep">Linear sweep</option><option value="am">AM signal</option><option value="fm">FM signal</option></select></div>
+            </div>
+            <div>
+              <div class="ctrl-row"><span class="ctrl-label">modulation rate / sweep speed</span><input type="range" min="1" max="20" value="4" step="1" id="mod-rate" oninput="onSignalChange('mod')"><span class="ctrl-val" id="mod-rate-v">4 Hz</span></div>
+              <div class="ctrl-row"><span class="ctrl-label">modulation depth</span><input type="range" min="0" max="1" value="0.5" step="0.05" id="mod-depth" oninput="onSignalChange('depth')"><span class="ctrl-val" id="mod-depth-v">0.50</span></div>
+              <div class="ctrl-row"><span class="ctrl-label">noise amount</span><input type="range" min="0" max="0.5" value="0.1" step="0.02" id="noise-amt" oninput="onSignalChange('noise')"><span class="ctrl-val" id="noise-amt-v">0.10</span></div>
+            </div>
+          </div>
+        </div>
+        <div class="sect-label">Generated waveform</div>
+        <div class="chart-wrap"><canvas id="wave-sine-chart"></canvas></div>
+        <div class="explain-box">Try <strong>Linear sweep</strong>: in the waveform itself the pitch change is hard to read, but in the spectrogram the diagonal ridge becomes obvious.</div>
+        <hr class="divider">
+        <div class="sect-label">Uploaded audio waveform <span class="badge">real audio</span></div>
+        <div id="wave-upload-area"><p class="no-upload">Upload an audio file on the left to compare synthetic theory with real sound.</p></div>
+      </div>
+
+      <div id="tab-fft" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-title">Frequency spectrum / FFT</p>
+            <p class="panel-sub">FFT decomposes a signal into sinusoidal components. It reveals which frequencies exist, but not when they occurred.</p>
+          </div>
+          <div class="learn-chip">Focus: global frequency content</div>
+        </div>
+        <div class="learning-strip">
+          <div class="learning-card"><div class="label">What to notice</div><strong>Peaks and sidebands</strong><p>AM and FM signals are great for seeing spectral structure beyond a single tone.</p></div>
+          <div class="learning-card"><div class="label">Core formula</div><strong>Δf = f<sub>s</sub> / N</strong><p>Larger N narrows each bin, improving frequency resolution.</p></div>
+          <div class="learning-card"><div class="label">New toggle</div><strong>Linear vs log magnitude</strong><p>Log scale reveals weaker harmonics and quieter components.</p></div>
+        </div>
+        <div class="card">
+          <div class="card-title">FFT parameters</div>
+          <div class="ctrl-row"><span class="ctrl-label">FFT size (N)</span><select id="fft-n" onchange="renderFFTTab(true)"><option value="256">256</option><option value="512">512</option><option value="1024" selected>1024</option><option value="2048">2048</option><option value="4096">4096</option></select></div>
+          <div class="toggle-row">
+            <div class="pill" id="stft-scale-linear" onclick="setScaleMode('stft','linear')">Linear energy</div>
+            <div class="pill active" id="stft-scale-log" onclick="setScaleMode('stft','log')">Log energy (dB)</div>
+          </div>
+        </div>
+        <div class="metric-row" id="fft-metrics"></div>
+        <div class="two-col">
+          <div class="card"><div class="sect-label">Synthetic signal spectrum</div><div class="chart-wrap"><canvas id="fft-sine-chart"></canvas></div></div>
+          <div class="card"><div class="sect-label">Uploaded audio spectrum <span class="badge">real audio</span></div><div class="chart-wrap" id="fft-upload-wrap"><p class="no-upload">Upload audio to see the real spectrum.</p></div></div>
+        </div>
+      </div>
+
+      <div id="tab-stft" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-title">Spectrogram / STFT</p>
+            <p class="panel-sub">This version computes a real STFT from the current signal. You can switch between linear energy and log energy to study time-frequency structure more clearly.</p>
+          </div>
+          <div class="learn-chip">Focus: time–frequency trade-off</div>
+        </div>
+        <div class="learning-strip">
+          <div class="learning-card"><div class="label">What to notice</div><strong>x = time, y = frequency</strong><p>Each column is one short-time FFT frame.</p></div>
+          <div class="learning-card"><div class="label">Trade-off</div><strong>Short window vs long window</strong><p>Short windows sharpen time detail, long windows sharpen frequency detail.</p></div>
+          <div class="learning-card"><div class="label">New feature</div><strong>Real log spectrogram</strong><p>Weak structures often appear only after the log transform.</p></div>
+        </div>
+        <div class="card">
+          <div class="card-title">STFT parameters</div>
+          <div class="ctrl-grid">
+            <div>
+              <div class="ctrl-row"><span class="ctrl-label">window size (samples)</span><select id="win-size" onchange="renderSTFTTab(true)"><option value="128">128</option><option value="256" selected>256</option><option value="512">512</option><option value="1024">1024</option><option value="2048">2048</option></select></div>
+              <div class="ctrl-row"><span class="ctrl-label">hop length (samples)</span><select id="hop-len" onchange="renderSTFTTab(true)"><option value="32">32</option><option value="64" selected>64</option><option value="128">128</option><option value="256">256</option></select></div>
+            </div>
+            <div>
+              <div class="toggle-row"><div class="pill active" id="stft-scale-linear" onclick="setScaleMode('stft','linear')">Linear energy</div><div class="pill" id="stft-scale-log" onclick="setScaleMode('stft','log')">Log energy (dB)</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="metric-row" id="stft-metrics"></div>
+        <div class="two-col">
+          <div class="card"><div class="sect-label">Current synthetic signal</div><canvas id="stft-sim-canvas" class="spectrogram"></canvas><p class="small-note" style="margin-top:7px">This is computed from the actual synthetic waveform above.</p></div>
+          <div class="card"><div class="sect-label">Uploaded audio spectrogram <span class="badge">real audio</span></div><canvas id="stft-upload-canvas" class="spectrogram"></canvas><p class="small-note" style="margin-top:7px" id="stft-upload-label">Upload audio to see its real spectrogram.</p></div>
+        </div>
+      </div>
+
+      <div id="tab-mfcc" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-title">MFCC, Δ, and ΔΔ</p>
+            <p class="panel-sub">This section computes real Mel filter bank energies, real MFCC via DCT, and temporal derivatives. It connects compact static features with change over time.</p>
+          </div>
+          <div class="learn-chip">Focus: compact ML-friendly features</div>
+        </div>
+        <div class="learning-strip">
+          <div class="learning-card"><div class="label">What to notice</div><strong>MFCC captures spectral envelope</strong><p>It compresses broad shape instead of preserving every frequency bin.</p></div>
+          <div class="learning-card"><div class="label">Delta idea</div><strong>Δ tracks first-order change</strong><p>If the sound is evolving, delta coefficients highlight that motion.</p></div>
+          <div class="learning-card"><div class="label">Delta-delta idea</div><strong>ΔΔ tracks acceleration</strong><p>This is useful when the rate of change itself changes.</p></div>
+        </div>
+        <div class="card">
+          <div class="card-title">MFCC parameters</div>
+          <div class="ctrl-grid">
+            <div>
+              <div class="ctrl-row"><span class="ctrl-label">number of coefficients</span><input type="range" min="5" max="40" value="13" step="1" id="n-mfcc" oninput="renderMFCCTab(true)"><span class="ctrl-val" id="n-mfcc-v">13</span></div>
+              <div class="ctrl-row"><span class="ctrl-label">number of Mel filters</span><input type="range" min="10" max="64" value="26" step="1" id="n-mels" oninput="renderMFCCTab(true)"><span class="ctrl-val" id="n-mels-v">26</span></div>
+            </div>
+            <div>
+              <div class="toggle-row"><div class="pill active" id="mfcc-scale-log" onclick="setScaleMode('mfcc','log')">Log Mel basis</div><div class="pill" id="mfcc-scale-linear" onclick="setScaleMode('mfcc','linear')">Linear Mel basis</div></div>
+            </div>
+          </div>
+        </div>
+        <div class="tab-mini">
+          <button class="active" id="mini-mfcc" onclick="setMiniView('mfcc')">MFCC</button>
+          <button id="mini-delta" onclick="setMiniView('delta')">Δ MFCC</button>
+          <button id="mini-deltadelta" onclick="setMiniView('deltadelta')">ΔΔ MFCC</button>
+        </div>
+        <div class="two-col">
+          <div class="card"><div class="sect-label">Mel spectrogram / filterbank space</div><canvas id="mfcc-spec-canvas" class="spectrogram"></canvas><p class="small-note" style="margin-top:7px">The feature space before DCT compression.</p></div>
+          <div class="card"><div class="sect-label" id="mfcc-view-label">MFCC coefficients</div><canvas id="mfcc-main-canvas" class="spectrogram"></canvas><p class="small-note" style="margin-top:7px" id="mfcc-dim-label">time × 13 coefficients</p></div>
+        </div>
+        <div class="card">
+          <div class="card-title">Mel filter bank</div>
+          <div class="chart-wrap" style="height:180px"><canvas id="mel-chart"></canvas></div>
+          <p class="small-note">Low frequencies get denser coverage because human perception is more discriminative there.</p>
+        </div>
+        <div class="card">
+          <div class="card-title">Uploaded audio feature view <span class="badge">real audio</span></div>
+          <div id="mfcc-upload-area"><p class="no-upload">Upload audio to see real MFCC / Δ / ΔΔ from the uploaded signal.</p></div>
+        </div>
+      </div>
+
+      <div id="tab-summary" class="panel">
+        <div class="panel-head">
+          <div>
+            <p class="panel-title">Summary & self-check</p>
+            <p class="panel-sub">Use this section to consolidate the differences across representations and check whether you can explain the full pipeline clearly.</p>
+          </div>
+          <div class="learn-chip">Focus: compare representations</div>
+        </div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <table class="sum-table">
+            <thead><tr><th>Representation</th><th>What it shows</th><th>Main strength</th><th>Main limitation</th></tr></thead>
+            <tbody>
+              <tr><td>Waveform</td><td>Amplitude over time</td><td>Direct raw signal</td><td>Frequency content is hidden</td></tr>
+              <tr><td>FFT</td><td>Overall frequency strength</td><td>Clear global peaks and harmonics</td><td>Loses time variation</td></tr>
+              <tr><td>STFT / Spectrogram</td><td>Frequency over time</td><td>Captures dynamics</td><td>Still high-dimensional</td></tr>
+              <tr><td>Log Spectrogram</td><td>Compressed dynamic range</td><td>Reveals weak components</td><td>Amplitude scale becomes less direct</td></tr>
+              <tr><td>MFCC</td><td>Compact cepstral summary</td><td>Efficient and ML-friendly</td><td>Less directly interpretable</td></tr>
+              <tr><td>Δ / ΔΔ</td><td>Change and acceleration</td><td>Adds temporal motion cues</td><td>Depends on stable frame sequence</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="warn-box">Try to explain this without looking: <strong>“MFCC summarizes the log Mel spectral envelope, while Δ and ΔΔ describe how that summary changes over time.”</strong></div>
+        <p class="panel-title" style="font-size:22px;margin-top:10px;margin-bottom:12px">Mini quiz</p>
+        <div id="quiz-container"></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<script>
+const SR = 22050;
+let uploadedPCM = null, uploadedSR = SR, uploadedDur = 0;
+let miniView = 'mfcc';
+const charts = {};
+const scaleMode = {fft:'linear', stft:'log', mfcc:'log'};
+const analysisCache = {synthetic:null, uploaded:null};
+const COLORS = {accent:'#3b82f6',accent2:'#10b981',accent3:'#ef4444',accent4:'#f59e0b',grid:'rgba(200,214,234,.55)',tick:'#7d8aa2'};
+
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function showTab(name,btn){document.querySelectorAll('.panel').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav button').forEach(b=>b.classList.remove('active'));document.getElementById('tab-'+name).classList.add('active');btn.classList.add('active'); if(name==='fft') renderFFTTab(false); if(name==='stft') renderSTFTTab(false); if(name==='mfcc') renderMFCCTab(false); if(name==='summary') buildQuiz();}
+function setInsight(main,detail){document.getElementById('live-insight-main').textContent=main;document.getElementById('live-insight-detail').textContent=detail;}
+function setScaleMode(section,mode){scaleMode[section]=mode;['linear','log'].forEach(m=>{const id1=`${section}-scale-${m}`; const el=document.getElementById(id1); if(el) el.classList.toggle('active',m===mode);}); if(section==='fft') renderFFTTab(true); if(section==='stft') renderSTFTTab(true); if(section==='mfcc') renderMFCCTab(true);}
+function setMiniView(view){miniView=view;['mfcc','delta','deltadelta'].forEach(v=>document.getElementById('mini-'+v).classList.toggle('active',v===view)); renderMFCCTab(false);}
+
+function hann(N){const w=new Float32Array(N); for(let n=0;n<N;n++) w[n]=0.5-0.5*Math.cos(2*Math.PI*n/(N-1||1)); return w;}
+function hzToMel(hz){return 2595*Math.log10(1+hz/700);} function melToHz(mel){return 700*(Math.pow(10,mel/2595)-1);} 
+function clamp(v,a,b){return Math.max(a,Math.min(b,v));}
+function nextPow2(n){let p=1; while(p<n) p<<=1; return p;}
+
+function currentSignalConfig(){return {freq:+document.getElementById('sine-freq').value,dur:+document.getElementById('sine-dur').value,type:document.getElementById('wave-type').value,modRate:+document.getElementById('mod-rate').value,modDepth:+document.getElementById('mod-depth').value,noise:+document.getElementById('noise-amt').value};}
+function genSignal(cfg,sr=SR){const N=Math.floor(sr*cfg.dur), y=new Float32Array(N); const f0=cfg.freq, rate=cfg.modRate, depth=cfg.modDepth, noise=cfg.noise; for(let i=0;i<N;i++){ const t=i/sr; let s=0; if(cfg.type==='sine'){s=Math.sin(2*Math.PI*f0*t);} else if(cfg.type==='chord'){s=0.65*Math.sin(2*Math.PI*f0*t)+0.35*Math.sin(2*Math.PI*1.5*f0*t);} else if(cfg.type==='noisy'){s=Math.sin(2*Math.PI*f0*t);} else if(cfg.type==='sweep'){const f1=Math.min(0.45*sr, f0*(1+depth*4)); const k=(f1-f0)/Math.max(cfg.dur,1e-6); s=Math.sin(2*Math.PI*(f0*t+0.5*k*t*t));} else if(cfg.type==='am'){const env=1 + depth*Math.sin(2*Math.PI*rate*t); s=env*Math.sin(2*Math.PI*f0*t);} else if(cfg.type==='fm'){const inst=f0 + depth*f0*0.75*Math.sin(2*Math.PI*rate*t); s=Math.sin(2*Math.PI*inst*t);} s*=0.5; s += (cfg.type==='noisy' ? (Math.random()*2-1)*noise : (Math.random()*2-1)*noise*0.2); y[i]=clamp(s,-1,1);} return y;}
+
+function fftReal(signal,N){const re=new Float64Array(N), im=new Float64Array(N); const M=Math.min(signal.length,N); for(let i=0;i<M;i++) re[i]=signal[i]; let bits=0; for(let v=N; v>1; v>>=1) bits++; for(let i=0;i<N;i++){ let j=0; for(let k=0;k<bits;k++) j=(j<<1)|((i>>k)&1); if(j>i){[re[i],re[j]]=[re[j],re[i]];[im[i],im[j]]=[im[j],im[i]];} } for(let len=2; len<=N; len<<=1){ const ang=-2*Math.PI/len; for(let i=0;i<N;i+=len){ for(let j=0;j<len/2;j++){ const c=Math.cos(ang*j), s=Math.sin(ang*j); const ur=re[i+j+len/2]*c - im[i+j+len/2]*s; const ui=re[i+j+len/2]*s + im[i+j+len/2]*c; re[i+j+len/2]=re[i+j]-ur; im[i+j+len/2]=im[i+j]-ui; re[i+j]+=ur; im[i+j]+=ui; } } } const half=N/2+1; const mag=new Float32Array(half); for(let i=0;i<half;i++) mag[i]=Math.sqrt(re[i]*re[i]+im[i]*im[i]); return {re,im,mag}; }
+
+function computeSTFT(pcm,sr,winSize,hop){ const NFFT=nextPow2(winSize); const window=hann(winSize); const nFrames=Math.max(1, 1 + Math.floor((pcm.length-winSize)/hop)); const nBins=NFFT/2+1; const spec=Array.from({length:nFrames},()=>new Float32Array(nBins)); for(let f=0;f<nFrames;f++){ const start=f*hop; const frame=new Float32Array(NFFT); for(let n=0;n<winSize;n++){ const idx=start+n; frame[n]=(idx<pcm.length?pcm[idx]:0)*window[n]; } const {mag}=fftReal(frame,NFFT); spec[f].set(mag); } return {spec,nFrames,nBins,nfft:NFFT,winSize,hop,sr}; }
+
+function powerToDb(spec){ let maxVal=1e-12; for(const row of spec) for(const v of row) if(v>maxVal) maxVal=v; const out=spec.map(row=>Float32Array.from(row,v=>20*Math.log10((v+1e-10)/maxVal+1e-10))); return out; }
+
+function createMelFilterbank(sr,nfft,nMels,fMin=0,fMax=null){ fMax=fMax||sr/2; const nBins=nfft/2+1; const melMin=hzToMel(fMin), melMax=hzToMel(fMax); const melPts=[]; for(let i=0;i<nMels+2;i++) melPts.push(melMin+(melMax-melMin)*i/(nMels+1)); const hzPts=melPts.map(melToHz); const bins=hzPts.map(hz=>Math.floor((nfft+1)*hz/sr)); const fb=Array.from({length:nMels},()=>new Float32Array(nBins)); for(let m=1;m<=nMels;m++){ const left=bins[m-1], center=bins[m], right=bins[m+1]; for(let k=left;k<center;k++) if(k>=0&&k<nBins) fb[m-1][k]=(k-left)/Math.max(center-left,1); for(let k=center;k<right;k++) if(k>=0&&k<nBins) fb[m-1][k]=(right-k)/Math.max(right-center,1); }
+ return {fb,hzPts,bins}; }
+function applyMel(spec,fb){ const out=Array.from({length:spec.length},()=>new Float32Array(fb.length)); for(let t=0;t<spec.length;t++){ for(let m=0;m<fb.length;m++){ let sum=0; const filter=fb[m], row=spec[t]; for(let k=0;k<filter.length;k++) if(filter[k]!==0) sum += row[k]*row[k]*filter[k]; out[t][m]=sum; } } return out; }
+function logCompress(mat,mode='log'){ if(mode==='linear') return mat.map(r=>Float32Array.from(r)); return mat.map(r=>Float32Array.from(r,v=>Math.log(v+1e-8))); }
+function dctMatrix(logMel,nMFCC){ const T=logMel.length, M=logMel[0]?.length||0; const out=Array.from({length:T},()=>new Float32Array(nMFCC)); for(let t=0;t<T;t++){ for(let c=0;c<nMFCC;c++){ let sum=0; for(let m=0;m<M;m++) sum += logMel[t][m] * Math.cos(Math.PI*c*(m+0.5)/M); out[t][c]=sum; } } return out; }
+function deltaFeatures(mat){ const T=mat.length, D=mat[0]?.length||0; const out=Array.from({length:T},()=>new Float32Array(D)); const denom=10; for(let t=0;t<T;t++){ for(let d=0;d<D;d++){ let num=0; for(let n=1;n<=2;n++){ const prev=mat[Math.max(0,t-n)][d]; const next=mat[Math.min(T-1,t+n)][d]; num += n*(next-prev); } out[t][d]=num/denom; } } return out; }
+function sampleForDisplay(mat,maxFrames=140){ if(mat.length<=maxFrames) return mat; const step=mat.length/maxFrames; const out=[]; for(let i=0;i<maxFrames;i++) out.push(mat[Math.floor(i*step)]); return out; }
+function normalize2D(mat){
+  const vals = [];
+  for (const row of mat) {
+    for (const v of row) vals.push(v);
+  }
+
+  vals.sort((a, b) => a - b);
+
+  const q = (p) => {
+    const idx = Math.floor((vals.length - 1) * p);
+    return vals[idx];
+  };
+
+  const lo = q(0.05);
+  const hi = q(0.95);
+  const range = (hi - lo) || 1;
+
+  return {
+    norm: mat.map(row =>
+      Float32Array.from(row, v => {
+        const clipped = Math.max(lo, Math.min(hi, v));
+        return (clipped - lo) / range;
+      })
+    ),
+    min: lo,
+    max: hi
+  };
+}
+function zScoreByColumn(mat){
+  const T = mat.length;
+  const D = mat[0]?.length || 0;
+  const out = Array.from({ length: T }, () => new Float32Array(D));
+
+  for (let d = 0; d < D; d++) {
+    let mean = 0;
+    for (let t = 0; t < T; t++) mean += mat[t][d];
+    mean /= Math.max(T, 1);
+
+    let variance = 0;
+    for (let t = 0; t < T; t++) {
+      const diff = mat[t][d] - mean;
+      variance += diff * diff;
+    }
+    variance /= Math.max(T, 1);
+
+    const std = Math.sqrt(variance) || 1;
+
+    for (let t = 0; t < T; t++) {
+      out[t][d] = (mat[t][d] - mean) / std;
+    }
+  }
+
+  return out;
+}
+
+function analyzePCM(pcm,sr,winSize,hop,nMels,nMFCC,mfccBasisMode){ const stft=computeSTFT(pcm,sr,winSize,hop); const mel=createMelFilterbank(sr,stft.nfft,nMels); const melSpec=applyMel(stft.spec,mel.fb); const melForDisplay = mfccBasisMode==='linear' ? melSpec : logCompress(melSpec,'log'); const logMel=logCompress(melSpec,'log'); const mfcc=dctMatrix(logMel,nMFCC); const delta=deltaFeatures(mfcc); const deltadelta=deltaFeatures(delta); return {...stft,melSpec,melForDisplay,logSpec:powerToDb(stft.spec),mfcc,delta,deltadelta,mel}; }
+
+function cropFrequencyRange(mat, sr, nfft, maxHz=4000){
+  const maxBin = Math.max(8, Math.min(Math.floor((nfft/2 + 1) * maxHz / (sr/2)), mat[0].length));
+  return mat.map(row => row.slice(0, maxBin));
+}
+
+function drawHeatmap(canvas, mat, options={}){
+  const {
+    sr = SR,
+    nfft = 512,
+    maxHz = null
+  } = options;
+
+  let data = mat;
+
+  if (maxHz !== null) {
+    data = cropFrequencyRange(data, sr, nfft, maxHz);
+  }
+
+  const display = sampleForDisplay(data);
+  const { norm } = normalize2D(display);
+
+  const dpr = window.devicePixelRatio || 1;
+  const W = canvas.clientWidth || 400;
+  const H = canvas.clientHeight || 240;
+  canvas.width = W * dpr;
+  canvas.height = H * dpr;
+
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const rows = norm.length;
+  const cols = norm[0]?.length || 1;
+  const cw = W / rows;
+  const ch = H / cols;
+
+  for (let x = 0; x < rows; x++) {
+    for (let y = 0; y < cols; y++) {
+      const e = norm[x][y];
+      const hue = 240 - 240 * e;
+      const sat = 85;
+      const light = 95 - 48 * e;
+      ctx.fillStyle = `hsl(${hue}, ${sat}%, ${light}%)`;
+      ctx.fillRect(x * cw, (cols - 1 - y) * ch, cw + 0.5, ch + 0.5);
+    }
+  }
+}
+
+function baseChartOpts(xLabel,yLabel){ return {responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{ticks:{maxTicksLimit:7,font:{size:10,family:'JetBrains Mono'},color:COLORS.tick},grid:{color:COLORS.grid},border:{color:'transparent'},title:{display:!!xLabel,text:xLabel,font:{size:10,family:'JetBrains Mono'},color:COLORS.tick}},y:{ticks:{font:{size:10,family:'JetBrains Mono'},maxTicksLimit:4,color:COLORS.tick},grid:{color:COLORS.grid},border:{color:'transparent'},title:{display:!!yLabel,text:yLabel,font:{size:10,family:'JetBrains Mono'},color:COLORS.tick}}} }; }
+function lineDs(data,color,fill){return{data,borderColor:color,borderWidth:2,pointRadius:0,tension:0,fill:!!fill,backgroundColor:fill||undefined};}
+
+function onSignalChange(source){ const cfg=currentSignalConfig(); document.getElementById('sine-freq-v').textContent=cfg.freq+' Hz'; document.getElementById('sine-dur-v').textContent=cfg.dur.toFixed(1)+' s'; document.getElementById('mod-rate-v').textContent=cfg.modRate+' Hz'; document.getElementById('mod-depth-v').textContent=cfg.modDepth.toFixed(2); document.getElementById('noise-amt-v').textContent=cfg.noise.toFixed(2); drawCurrentWaveform(); renderFFTTab(false); renderSTFTTab(false); renderMFCCTab(false); const messages={freq:[`Base frequency changed to ${cfg.freq} Hz.`,`The waveform period changed, so the FFT peak and spectrogram ridge move up or down in frequency.`],dur:[`Duration changed to ${cfg.dur.toFixed(1)} seconds.`,`A longer signal gives more frames for STFT and more stable averages, while a shorter signal gives fewer observations.`],type:[`Signal type switched to ${document.getElementById('wave-type').selectedOptions[0].text}.`,`This changes the structure you should expect later: sweep makes diagonal ridges, AM makes sidebands and pulsation, FM broadens and bends the spectrum.`],mod:[`Modulation / sweep rate changed to ${cfg.modRate} Hz.`,`Faster modulation produces quicker temporal variation, so STFT and delta features should respond more strongly.`],depth:[`Modulation depth changed to ${cfg.modDepth.toFixed(2)}.`,`Deeper modulation increases movement away from the base tone, making sidebands or sweeps more visually obvious.`],noise:[`Noise amount changed to ${cfg.noise.toFixed(2)}.`,`More noise raises the floor, making weak structure harder to see unless you use log scaling or compact features.`]}; if(messages[source]) setInsight(messages[source][0],messages[source][1]); }
+
+function drawCurrentWaveform(){ const cfg=currentSignalConfig(); const y=genSignal(cfg,SR); analysisCache.syntheticPCM = y; const step=Math.max(1,Math.floor(y.length/800)); const pts=[],lbs=[]; for(let i=0;i<y.length;i+=step){pts.push(+y[i].toFixed(4));lbs.push((i/SR).toFixed(3));} destroyChart('wave-sine'); charts['wave-sine']=new Chart(document.getElementById('wave-sine-chart'),{type:'line',data:{labels:lbs,datasets:[lineDs(pts,COLORS.accent,'rgba(59,130,246,.12)')]},options:baseChartOpts('Time (s)','Amplitude')}); }
+function drawUploadWaveform(pcm,sr){ const step=Math.max(1,Math.floor(pcm.length/800)); const pts=[],lbs=[]; for(let i=0;i<pcm.length;i+=step){pts.push(+pcm[i].toFixed(4));lbs.push((i/sr).toFixed(2));} const area=document.getElementById('wave-upload-area'); area.innerHTML='<div class="chart-wrap"><canvas id="wave-upload-chart"></canvas></div>'; destroyChart('wave-upload'); charts['wave-upload']=new Chart(document.getElementById('wave-upload-chart'),{type:'line',data:{labels:lbs,datasets:[lineDs(pts,COLORS.accent2,'rgba(16,185,129,.12)')]},options:baseChartOpts('Time (s)','Amplitude')}); }
+
+function fftDisplayData(pcm,sr,N,maxHz){ const chunk=pcm.length>=N?pcm.subarray(0,N):pcm; const {mag}=fftReal(chunk,N); let arr=Array.from(mag); if(scaleMode.fft==='log') arr=arr.map(v=>20*Math.log10(v+1e-8)); const maxBin=Math.min(arr.length-1, Math.floor(maxHz/sr*N)); const pts=arr.slice(0,maxBin+1); const step=Math.max(1,Math.floor(pts.length/6)); const labs=pts.map((_,i)=>i%step===0?Math.round(i*sr/N):''); return {pts,labs}; }
+function renderFFTTab(explain){ const N=+document.getElementById('fft-n').value; const binHz=(SR/N).toFixed(2), nyq=Math.round(SR/2); document.getElementById('fft-metrics').innerHTML=`<div class="metric"><div class="metric-label">Bin size Δf</div><div class="metric-val">${binHz} <span>Hz</span></div></div><div class="metric"><div class="metric-label">Nyquist freq</div><div class="metric-val">${(nyq/1000).toFixed(1)} <span>kHz</span></div></div><div class="metric"><div class="metric-label">View scale</div><div class="metric-val">${scaleMode.fft==='log'?'dB':'Linear'}</div></div>`; const syn=analysisCache.syntheticPCM||genSignal(currentSignalConfig(),SR); const synData=fftDisplayData(syn,SR,N,5000); destroyChart('fft-sine'); charts['fft-sine']=new Chart(document.getElementById('fft-sine-chart'),{type:'line',data:{labels:synData.labs,datasets:[lineDs(synData.pts,COLORS.accent,'rgba(59,130,246,.12)')]},options:baseChartOpts('Frequency (Hz)',scaleMode.fft==='log'?'Magnitude (dB)':'Magnitude')}); const wrap=document.getElementById('fft-upload-wrap'); if(uploadedPCM){ wrap.innerHTML='<canvas id="fft-upload-chart"></canvas>'; wrap.style.height='220px'; const upData=fftDisplayData(uploadedPCM,uploadedSR,N,8000); destroyChart('fft-upload'); charts['fft-upload']=new Chart(document.getElementById('fft-upload-chart'),{type:'line',data:{labels:upData.labs,datasets:[lineDs(upData.pts,COLORS.accent2,'rgba(16,185,129,.12)')]},options:baseChartOpts('Frequency (Hz)',scaleMode.fft==='log'?'Magnitude (dB)':'Magnitude')}); }
+ if(explain){ setInsight(scaleMode.fft==='log'?'FFT switched to log magnitude.':'FFT switched to linear magnitude.', scaleMode.fft==='log'?'Log scale compresses dynamic range, so weak harmonics and quiet components become easier to see next to strong peaks.':'Linear scale preserves raw contrast, so dominant peaks stand out more but weak components may disappear visually.'); } }
+
+function renderSTFTTab(explain){ const winSize=+document.getElementById('win-size').value, hop=+document.getElementById('hop-len').value; const freqRes=(SR/nextPow2(winSize)).toFixed(1), winMs=(1000*winSize/SR).toFixed(1), hopMs=(1000*hop/SR).toFixed(1); document.getElementById('stft-metrics').innerHTML=`<div class="metric"><div class="metric-label">Freq. resolution</div><div class="metric-val">${freqRes} <span>Hz</span></div></div><div class="metric"><div class="metric-label">Window duration</div><div class="metric-val">${winMs} <span>ms</span></div></div><div class="metric"><div class="metric-label">Hop duration</div><div class="metric-val">${hopMs} <span>ms</span></div></div>`; const syn=analysisCache.syntheticPCM||genSignal(currentSignalConfig(),SR); const synAnalysis=analyzePCM(syn,SR,winSize,hop,+document.getElementById('n-mels').value,+document.getElementById('n-mfcc').value,scaleMode.mfcc); analysisCache.synthetic=synAnalysis; drawHeatmap(
+  document.getElementById('stft-sim-canvas'),
+  scaleMode.stft==='log' ? synAnalysis.logSpec : synAnalysis.spec,
+  { sr: SR, nfft: synAnalysis.nfft, maxHz: 4000 }
+); if(uploadedPCM){ const upAnalysis=analyzePCM(uploadedPCM,uploadedSR,winSize,hop,+document.getElementById('n-mels').value,+document.getElementById('n-mfcc').value,scaleMode.mfcc); analysisCache.uploaded=upAnalysis; drawHeatmap(
+  document.getElementById('stft-upload-canvas'),
+  scaleMode.stft==='log' ? upAnalysis.logSpec : upAnalysis.spec,
+  { sr: uploadedSR, nfft: upAnalysis.nfft, maxHz: 4000 }
+); document.getElementById('stft-upload-label').textContent='Real spectrogram of uploaded audio'; } else { const canvas=document.getElementById('stft-upload-canvas'); const ctx=canvas.getContext('2d'); ctx.clearRect(0,0,canvas.width,canvas.height); document.getElementById('stft-upload-label').textContent='Upload audio to see its real spectrogram.'; }
+ if(explain){ const shorter = winSize <= 256; setInsight(`STFT updated: window ${winSize}, hop ${hop}.`, shorter ? 'A shorter window emphasizes when events happen, so transients and modulation become clearer, but frequency ridges become thicker and less precise.' : 'A longer window emphasizes which frequencies are present, so tones become cleaner and narrower, but fast timing changes blur across time.'); } }
+
+function drawMelFilters(nFilters, melObj){ const maxHz=8000; const centers=melObj?melObj.hzPts:Array.from({length:nFilters+2},(_,i)=>700*(Math.pow(10,i*hzToMel(maxHz)/((nFilters+1)*2595))-1)); const nPoints=240, showF=Math.min(nFilters,8), palette=['#3b82f6','#10b981','#ef4444','#f59e0b','#7c3aed','#0ea5e9','#ec4899','#14b8a6']; const datasets=[]; for(let f=1;f<=showF;f++){ const data=[]; for(let i=0;i<nPoints;i++){ const hz=(i/nPoints)*maxHz; let v=0; if(hz>=centers[f-1]&&hz<=centers[f]) v=(hz-centers[f-1])/Math.max(centers[f]-centers[f-1],1e-9); else if(hz>centers[f]&&hz<=centers[f+1]) v=(centers[f+1]-hz)/Math.max(centers[f+1]-centers[f],1e-9); data.push({x:Math.round(hz),y:+v.toFixed(3)}); } datasets.push({data,borderColor:palette[f%palette.length],borderWidth:2,pointRadius:0,fill:false}); } destroyChart('mel'); charts['mel']=new Chart(document.getElementById('mel-chart'),{type:'line',data:{datasets},options:{responsive:true,maintainAspectRatio:false,animation:false,plugins:{legend:{display:false}},scales:{x:{type:'linear',title:{display:true,text:'Frequency (Hz)',font:{size:10,family:'JetBrains Mono'},color:COLORS.tick},ticks:{font:{size:10,family:'JetBrains Mono'},maxTicksLimit:6,color:COLORS.tick},grid:{color:COLORS.grid},border:{color:'transparent'}},y:{min:0,max:1.1,title:{display:true,text:'Weight',font:{size:10,family:'JetBrains Mono'},color:COLORS.tick},ticks:{font:{size:10,family:'JetBrains Mono'},maxTicksLimit:4,color:COLORS.tick},grid:{color:COLORS.grid},border:{color:'transparent'}}}}}); }
+
+function renderMFCCTab(explain){ const nMFCC=+document.getElementById('n-mfcc').value, nMels=+document.getElementById('n-mels').value; document.getElementById('n-mfcc-v').textContent=nMFCC; document.getElementById('n-mels-v').textContent=nMels; document.getElementById('mfcc-dim-label').textContent=`time × ${nMFCC} coefficients`; const winSize=+document.getElementById('win-size').value, hop=+document.getElementById('hop-len').value; const syn=analysisCache.syntheticPCM||genSignal(currentSignalConfig(),SR); const synAnalysis=analyzePCM(syn,SR,winSize,hop,nMels,nMFCC,scaleMode.mfcc); analysisCache.synthetic=synAnalysis; drawHeatmap(document.getElementById('mfcc-spec-canvas'), synAnalysis.melForDisplay); const viewMap = {
+  mfcc: zScoreByColumn(synAnalysis.mfcc),
+  delta: zScoreByColumn(synAnalysis.delta),
+  deltadelta: zScoreByColumn(synAnalysis.deltadelta)
+};
+
+const labelMap = {
+  mfcc: 'MFCC coefficients',
+  delta: 'Δ MFCC coefficients',
+  deltadelta: 'ΔΔ MFCC coefficients'
+};
+
+document.getElementById('mfcc-view-label').textContent = labelMap[miniView];
+drawHeatmap(document.getElementById('mfcc-main-canvas'), viewMap[miniView]); drawMelFilters(nMels,synAnalysis.mel); if(uploadedPCM){ const upAnalysis=analyzePCM(uploadedPCM,uploadedSR,winSize,hop,nMels,nMFCC,scaleMode.mfcc); analysisCache.uploaded=upAnalysis; drawUploadMFCC(upAnalysis); }
+ if(explain){ const msg = miniView==='mfcc' ? 'MFCC keeps the broad spectral envelope while discarding much of the raw detail.' : miniView==='delta' ? 'Delta coefficients emphasize frame-to-frame change, so motion or articulation becomes clearer.' : 'Delta-delta coefficients emphasize how the rate of change itself evolves over time.'; setInsight(`MFCC view updated: ${document.getElementById('mfcc-view-label').textContent}.`, msg + ` Using ${nMels} Mel filters and ${nMFCC} coefficients changes how much detail is preserved before and after compression.`); } }
+
+function drawUploadMFCC(analysis){
+  const area = document.getElementById('mfcc-upload-area');
+  area.innerHTML =
+    '<canvas id="mfcc-upload-canvas" style="width:100%;height:180px;display:block;border-radius:16px;border:1px solid var(--border);background:#f9fbfe"></canvas>' +
+    '<p class="small-note" style="margin-top:7px">Real ' +
+    (miniView === 'mfcc' ? 'MFCC' : miniView === 'delta' ? 'Δ MFCC' : 'ΔΔ MFCC') +
+    ' from uploaded audio</p>';
+
+  const viewMap = {
+    mfcc: zScoreByColumn(analysis.mfcc),
+    delta: zScoreByColumn(analysis.delta),
+    deltadelta: zScoreByColumn(analysis.deltadelta)
+  };
+
+  drawHeatmap(document.getElementById('mfcc-upload-canvas'), viewMap[miniView]);
+}
+function handleUpload(event){ const file=event.target.files[0]; if(!file) return; document.getElementById('upload-label').innerHTML=`<strong>${file.name}</strong>`; const url=URL.createObjectURL(file); document.getElementById('audio-player').src=url; document.getElementById('upload-meta-card').style.display='block'; const audioCtx=new(window.AudioContext||window.webkitAudioContext)({sampleRate:22050}); const reader=new FileReader(); reader.onload=e=>{ audioCtx.decodeAudioData(e.target.result.slice(0),buf=>{ uploadedSR=buf.sampleRate; const ch=buf.numberOfChannels>1?mixToMono(buf):buf.getChannelData(0); uploadedPCM=Float32Array.from(ch); uploadedDur=buf.duration; const nyq=Math.round(uploadedSR/2); document.getElementById('meta-row').innerHTML=`<div class="meta-stat"><div class="meta-stat-label">Sample rate</div><div class="meta-stat-val">${(uploadedSR/1000).toFixed(1)}<span style="font-size:11px;color:var(--text2)"> kHz</span></div></div><div class="meta-stat"><div class="meta-stat-label">Duration</div><div class="meta-stat-val">${uploadedDur.toFixed(2)}<span style="font-size:11px;color:var(--text2)"> s</span></div></div><div class="meta-stat"><div class="meta-stat-label">Nyquist</div><div class="meta-stat-val">${(nyq/1000).toFixed(1)}<span style="font-size:11px;color:var(--text2)"> kHz</span></div></div><div class="meta-stat"><div class="meta-stat-label">Samples</div><div class="meta-stat-val">${(uploadedPCM.length/1000).toFixed(0)}<span style="font-size:11px;color:var(--text2)">k</span></div></div>`; const st=document.getElementById('upload-status'); st.style.display='block'; st.className='upload-status'; st.textContent=`✓ ${file.name} loaded — real waveform / FFT / STFT / MFCC ready`; drawUploadWaveform(uploadedPCM,uploadedSR); renderFFTTab(false); renderSTFTTab(false); renderMFCCTab(false); setInsight(`Uploaded audio loaded: ${file.name}.`,`All analysis panels are now computed from the real signal rather than a simulated placeholder.`); },()=>{ const st=document.getElementById('upload-status'); st.style.display='block'; st.className='upload-status error'; st.textContent='✗ Could not decode audio. Try WAV or MP3.'; }); }; reader.readAsArrayBuffer(file); }
+function mixToMono(buf){ const len=buf.length; const out=new Float32Array(len); for(let c=0;c<buf.numberOfChannels;c++){ const data=buf.getChannelData(c); for(let i=0;i<len;i++) out[i]+=data[i]/buf.numberOfChannels; } return out; }
+
+const quizData=[
+{q:'Why is log spectrogram view often useful?',opts:['It always improves time resolution','It compresses dynamic range so weaker components become visible','It removes harmonics entirely','It makes MFCC unnecessary'],ans:1},
+{q:'What happens if the STFT window is cut in half?',opts:['Time resolution improves and frequency resolution worsens','Both time and frequency resolution improve','Frequency resolution improves and time resolution worsens','Nothing changes'],ans:0},
+{q:'What do delta MFCC features primarily capture?',opts:['Absolute loudness only','Sample rate mismatch','Frame-to-frame change in cepstral features','The exact waveform phase'],ans:2},
+{q:'Why use MFCC instead of raw spectrogram bins for many ML tasks?',opts:['MFCC stores more raw detail','MFCC is compact and focuses on broad perceptual spectral structure','MFCC contains the original waveform samples','MFCC removes all temporal information'],ans:1}
+];
+let quizBuilt=false, answered={};
+function buildQuiz(){ if(quizBuilt) return; quizBuilt=true; let html=''; quizData.forEach((q,qi)=>{ html+=`<div class="card" style="margin-bottom:.75rem"><p class="quiz-q">Q${qi+1} — ${q.q}</p>`; q.opts.forEach((opt,oi)=>html+=`<button class="quiz-opt" id="q${qi}o${oi}" onclick="answerQ(${qi},${oi})">${opt}</button>`); html+=`<div class="quiz-fb" id="q${qi}fb" style="display:none"></div></div>`;}); document.getElementById('quiz-container').innerHTML=html; }
+function answerQ(qi,oi){ if(answered[qi]) return; answered[qi]=true; quizData[qi].opts.forEach((_,i)=>{ const b=document.getElementById(`q${qi}o${i}`); b.disabled=true; if(i===quizData[qi].ans) b.classList.add('correct'); else if(i===oi) b.classList.add('wrong'); }); const fb=document.getElementById(`q${qi}fb`); fb.style.display='block'; fb.style.color=oi===quizData[qi].ans?'#047857':'#be123c'; fb.textContent=oi===quizData[qi].ans?'✓ Correct!':'✗ Not quite — the correct answer is highlighted above.'; }
+
+onSignalChange('type');
+</script>
+</body>
+</html>
